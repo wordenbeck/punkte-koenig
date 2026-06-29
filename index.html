@@ -71,10 +71,18 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;
 .vscroll{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px}
 .vscroll::-webkit-scrollbar{display:none}
 .hlist{display:flex;flex-direction:column;gap:7px}
-.cat{margin-bottom:18px}
-.catgames{font-size:13px;margin:4px 2px 8px}
-.catrest{font-size:13px;margin-top:7px;padding:0 4px;line-height:1.5}
-.catempty{font-size:13px;opacity:.5;margin:2px}
+.catempty{font-size:14px;opacity:.55;margin:6px 2px 2px;text-align:center;padding:18px 0}
+.histgames{margin-bottom:14px}
+.histgames .gtile{justify-content:space-between;padding:11px 16px}
+.histgames .gtile .logo{width:auto;max-width:92px;height:28px}
+.histgames .gtile:not(.on){opacity:.5}
+.gcount{font-weight:900;font-size:19px;flex:0 0 auto}
+.medals{display:flex;flex-direction:column;gap:8px}
+.med{display:flex;align-items:center;gap:12px;padding:11px 15px;border-radius:14px}
+.med .mi{font-size:23px;width:28px;text-align:center;flex:0 0 auto}
+.med .mn{flex:1;min-width:0;font-weight:900;font-size:17px}
+.med .mn small{display:block;font-weight:600;font-size:11px;opacity:.55}
+.med .mv{font-weight:900;font-size:20px;flex:0 0 auto}
 .start{margin-top:auto;border:none;padding:16px;font-size:18px;font-weight:700}
 .start:active{transform:scale(.97)}
 
@@ -195,14 +203,12 @@ body,.screen{color:var(--ink)}
 .vlink:active{transform:scale(.95)}
 .vlink.corner{border:none;background:none;color:var(--ink);opacity:.55;padding:6px;line-height:0}
 .vlink.corner svg{display:block}
-.cattitle{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;opacity:.5;color:var(--ink)}
-.catgames{color:var(--ink);opacity:.55;font-weight:600}
-.catlead{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--outline);border-radius:14px;padding:12px 15px;box-shadow:2px 2px 0 var(--shadowc)}
-.clcrown{font-size:19px}
-.clname{flex:1;font-weight:900;font-size:19px;color:var(--ink)}
-.clw{font-weight:800;color:var(--lead);font-size:15px}
-.catrest{color:var(--ink);opacity:.6;font-weight:600}
 .catempty{color:var(--ink)}
+.gcount{color:var(--ink)}
+.histgames .gtile.on .gcount{color:var(--sel-ink)}
+.med{background:var(--card);border:1.5px solid var(--divider);color:var(--ink)}
+.med.first{border:2px solid var(--outline);box-shadow:2px 2px 0 var(--shadowc)}
+.med .mv{color:var(--lead)}
 .hcard{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:11px 14px}
 .hdot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:0 0 auto}
 .hmid{flex:1;min-width:0}
@@ -241,53 +247,61 @@ const Hist={
 };
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 /* ================= HISTORIE ================= */
+function colorFor(n){let x=0;for(const ch of String(n))x=(x*31+ch.charCodeAt(0))>>>0;return COLORS[x%COLORS.length]}
 function statsFor(filter){
   const games=Hist.load().filter(r=>filter?r.game===filter:true);
-  const wins={},players=new Set();
-  games.forEach(r=>{wins[r.winner]=(wins[r.winner]||0)+1;(r.players||[]).forEach(p=>players.add(p));players.add(r.winner)});
-  const rank=[...players].map(n=>({n,w:wins[n]||0})).sort((a,b)=>b.w-a.w||a.n.localeCompare(b.n));
+  const wins={},parts={},players=new Set();
+  games.forEach(r=>{wins[r.winner]=(wins[r.winner]||0)+1;(r.players||[]).forEach(p=>{players.add(p);parts[p]=(parts[p]||0)+1});players.add(r.winner)});
+  const rank=[...players].map(n=>({n,w:wins[n]||0,p:parts[n]||0})).sort((a,b)=>b.w-a.w||b.p-a.p||a.n.localeCompare(b.n));
   return {total:games.length,rank};
 }
-function catBlock(title,filter){
-  const s=statsFor(filter);
-  if(!s.total) return `<div class="cat"><div class="cattitle">${title}</div><div class="catempty">Noch keine Spiele</div></div>`;
-  const lead=s.rank[0];
-  const rest=s.rank.slice(1).map(x=>`${esc(x.n)} ${x.w}`).join(' · ');
-  return `<div class="cat">
-    <div class="cattitle">${title}</div>
-    <div class="catgames">${s.total} ${s.total===1?'Spiel':'Spiele'} insgesamt</div>
-    <div class="catlead"><span class="clcrown">👑</span><span class="clname">${esc(lead.n)}</span><span class="clw">${lead.w} ${lead.w===1?'Sieg':'Siege'}</span></div>
-    ${rest?`<div class="catrest">${rest}</div>`:''}
-  </div>`;
+function medalBoard(game){
+  const s=statsFor(game);
+  if(!s.total) return `<div class="catempty">Noch keine ${game==='flip7'?'Flip 7':'Uno'}-Spiele gespielt.</div>`;
+  return s.rank.map((x,i)=>`<div class="med ${i===0?'first':''}">
+    <span class="mi">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.'}</span>
+    <span class="dot" style="background:${colorFor(x.n)}">${esc(initial(x.n))}</span>
+    <span class="mn">${esc(x.n)}<small>aus ${x.p} ${x.p===1?'Spiel':'Spielen'}</small></span>
+    <span class="mv">${x.w}</span>
+  </div>`).join('');
 }
+let histSel=null;
 function renderHistory(dir){
   const h=Hist.load();
   const unoN=h.filter(r=>r.game==='uno').length, flipN=h.filter(r=>r.game==='flip7').length;
-  setTheme(unoN>flipN?'uno':'flip7');   // Design = meistgespieltes Spiel
+  if(!histSel) histSel = unoN>flipN?'uno':'flip7';   // Default = meistgespielt
+  setTheme(histSel);
   const v=view(`
    <div class="game">
     <button class="vlink hback" id="back">‹ Zurück</button>
     <h1 class="htitle htitle-screen">Bestenliste</h1>
     <div class="vscroll">
       ${h.length?`
-        ${catBlock('Uno','uno')}
-        ${catBlock('Flip 7','flip7')}
-        ${catBlock('Gesamt','')}
-        <div class="lbl" style="margin-top:14px">Letzte Spiele</div>
+        <div class="games histgames">
+          <button class="gtile ${histSel==='flip7'?'on':''}" data-g="flip7">${logo('flip7','')}<span class="gcount">${flipN}×</span></button>
+          <button class="gtile ${histSel==='uno'?'on':''}" data-g="uno">${logo('uno','')}<span class="gcount">${unoN}×</span></button>
+        </div>
+        <div class="medals" id="medals">${medalBoard(histSel)}</div>
+        <div class="lbl" style="margin-top:18px">Letzte Spiele</div>
         <div class="hlist">${h.slice(0,20).map(histCard).join('')}</div>
       `:`<p class="hint" style="text-align:center;margin-top:40px;font-size:15px">Noch keine Spiele gespielt.<br>Beende ein Spiel über „Spiel beenden", dann erscheint es hier.</p>`}
     </div>
     ${h.length?`<button class="start ghostbtn" id="clear">Verlauf löschen</button>`:''}
    </div>`,dir);
-  v.querySelector('#back').onclick=()=>{buzz(8);renderSetup(-1)};
+  v.querySelector('#back').onclick=()=>{histSel=null;buzz(8);renderSetup(-1)};
+  v.querySelectorAll('.histgames .gtile').forEach(b=>b.onclick=()=>{
+    histSel=b.dataset.g;buzz(8);setTheme(histSel);
+    v.querySelectorAll('.histgames .gtile').forEach(x=>x.classList.toggle('on',x.dataset.g===histSel));
+    v.querySelector('#medals').innerHTML=medalBoard(histSel);
+  });
   const c=v.querySelector('#clear');
-  if(c)c.onclick=()=>{if(confirm('Gesamten Verlauf unwiderruflich löschen?')){buzz(20);Hist.clear();renderHistory()}};
+  if(c)c.onclick=()=>{if(confirm('Gesamten Verlauf unwiderruflich löschen?')){buzz(20);Hist.clear();histSel=null;renderHistory()}};
 }
 function histCard(r){
   const d=new Date(r.ts);
   const date=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
   const idx=r.players.indexOf(r.winner);
-  const col=COLORS[(idx<0?0:idx)%COLORS.length];
+  const col=colorFor(r.winner);
   const ws=idx>=0?r.scores[idx]:'';
   return `<div class="hcard">
     <span class="hdot" style="background:${col}">${esc(initial(r.winner))}</span>
