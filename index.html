@@ -64,11 +64,17 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;
 .addrow{display:flex;align-items:center;gap:11px;padding:11px 0;border:none;background:none;font-size:15px;font-weight:600}
 .plus{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
 .plist{margin-bottom:16px}
-.stop{display:flex;justify-content:flex-end;margin-bottom:2px}
+.setup{position:relative}
+.vlink.corner{position:absolute;top:54px;right:20px;z-index:10}
 .htitle-screen{font-size:30px!important;white-space:normal!important;margin-bottom:14px}
+.hback{align-self:flex-start;margin-bottom:10px}
 .vscroll{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px}
 .vscroll::-webkit-scrollbar{display:none}
-.lblist,.hlist{display:flex;flex-direction:column;gap:7px}
+.hlist{display:flex;flex-direction:column;gap:7px}
+.cat{margin-bottom:18px}
+.catgames{font-size:13px;margin:4px 2px 8px}
+.catrest{font-size:13px;margin-top:7px;padding:0 4px;line-height:1.5}
+.catempty{font-size:13px;opacity:.5;margin:2px}
 .start{margin-top:auto;border:none;padding:16px;font-size:18px;font-weight:700}
 .start:active{transform:scale(.97)}
 
@@ -187,10 +193,15 @@ body,.screen{color:var(--ink)}
 /* Historie */
 .vlink{border:1.5px solid var(--outline);background:var(--card);color:var(--ink);font-family:inherit;font-weight:800;font-size:14px;padding:8px 13px;border-radius:12px}
 .vlink:active{transform:scale(.95)}
-.lbrow{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:13px;padding:11px 15px}
-.lbpos{font-weight:900;color:var(--accent);width:18px;text-align:center}
-.lbname{flex:1;font-weight:800;color:var(--ink)}
-.lbwins{font-weight:800;color:var(--lead);font-size:14px}
+.vlink.corner{border:none;background:none;color:var(--ink);opacity:.5;font-weight:700;font-size:13px;padding:4px 2px}
+.cattitle{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;opacity:.5;color:var(--ink)}
+.catgames{color:var(--ink);opacity:.55;font-weight:600}
+.catlead{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--outline);border-radius:14px;padding:12px 15px;box-shadow:2px 2px 0 var(--shadowc)}
+.clcrown{font-size:19px}
+.clname{flex:1;font-weight:900;font-size:19px;color:var(--ink)}
+.clw{font-weight:800;color:var(--lead);font-size:15px}
+.catrest{color:var(--ink);opacity:.6;font-weight:600}
+.catempty{color:var(--ink)}
 .hcard{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:11px 14px}
 .hdot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:0 0 auto}
 .hmid{flex:1;min-width:0}
@@ -229,20 +240,38 @@ const Hist={
 };
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 /* ================= HISTORIE ================= */
+function statsFor(filter){
+  const games=Hist.load().filter(r=>filter?r.game===filter:true);
+  const wins={},players=new Set();
+  games.forEach(r=>{wins[r.winner]=(wins[r.winner]||0)+1;(r.players||[]).forEach(p=>players.add(p));players.add(r.winner)});
+  const rank=[...players].map(n=>({n,w:wins[n]||0})).sort((a,b)=>b.w-a.w||a.n.localeCompare(b.n));
+  return {total:games.length,rank};
+}
+function catBlock(title,filter){
+  const s=statsFor(filter);
+  if(!s.total) return `<div class="cat"><div class="cattitle">${title}</div><div class="catempty">Noch keine Spiele</div></div>`;
+  const lead=s.rank[0];
+  const rest=s.rank.slice(1).map(x=>`${esc(x.n)} ${x.w}`).join(' · ');
+  return `<div class="cat">
+    <div class="cattitle">${title}</div>
+    <div class="catgames">${s.total} ${s.total===1?'Spiel':'Spiele'} insgesamt</div>
+    <div class="catlead"><span class="clcrown">👑</span><span class="clname">${esc(lead.n)}</span><span class="clw">${lead.w} ${lead.w===1?'Sieg':'Siege'}</span></div>
+    ${rest?`<div class="catrest">${rest}</div>`:''}
+  </div>`;
+}
 function renderHistory(dir){
   const h=Hist.load();
-  const wins={};h.forEach(r=>{wins[r.winner]=(wins[r.winner]||0)+1});
-  const lb=Object.entries(wins).sort((a,b)=>b[1]-a[1]);
   const v=view(`
    <div class="game">
-    <div class="stop"><button class="vlink" id="back">‹ Zurück</button></div>
-    <h1 class="htitle htitle-screen">Verlauf</h1>
+    <button class="vlink hback" id="back">‹ Zurück</button>
+    <h1 class="htitle htitle-screen">Bestenliste</h1>
     <div class="vscroll">
       ${h.length?`
-        <div class="lbl">Bestenliste 🏆</div>
-        <div class="lblist">${lb.map(([n,c],i)=>`<div class="lbrow"><span class="lbpos">${i+1}</span><span class="lbname">${esc(n)}</span><span class="lbwins">${c}× gewonnen</span></div>`).join('')}</div>
-        <div class="lbl" style="margin-top:20px">Letzte Spiele · ${h.length}</div>
-        <div class="hlist">${h.map(histCard).join('')}</div>
+        ${catBlock('Uno','uno')}
+        ${catBlock('Flip 7','flip7')}
+        ${catBlock('Gesamt','')}
+        <div class="lbl" style="margin-top:14px">Letzte Spiele</div>
+        <div class="hlist">${h.slice(0,20).map(histCard).join('')}</div>
       `:`<p class="hint" style="text-align:center;margin-top:40px;font-size:15px">Noch keine Spiele gespielt.<br>Beende ein Spiel über „Spiel beenden", dann erscheint es hier.</p>`}
     </div>
     ${h.length?`<button class="start ghostbtn" id="clear">Verlauf löschen</button>`:''}
@@ -289,8 +318,8 @@ function renderSetup(dir){
   setTheme(draft.game);
   const v=view(`
    <div class="setup">
-    <div class="stop"><button class="vlink" id="verlauf">📜 Verlauf</button></div>
-    <h1 class="htitle">Wer wird König oder Königin? 👑</h1>
+    <button class="vlink corner" id="verlauf">Verlauf ›</button>
+    <h1 class="htitle">Wer wird König oder Königin?</h1>
     <div class="games">
       <button class="gtile ${draft.game==='flip7'?'on':''}" data-g="flip7" aria-label="Flip 7">${logo('flip7','')}</button>
       <button class="gtile ${draft.game==='uno'?'on':''}" data-g="uno" aria-label="Uno">${logo('uno','')}</button>
