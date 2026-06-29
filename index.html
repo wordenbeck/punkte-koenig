@@ -262,6 +262,8 @@ function catBlock(title,filter){
 }
 function renderHistory(dir){
   const h=Hist.load();
+  const unoN=h.filter(r=>r.game==='uno').length, flipN=h.filter(r=>r.game==='flip7').length;
+  setTheme(unoN>flipN?'uno':'flip7');   // Design = meistgespieltes Spiel
   const v=view(`
    <div class="game">
     <button class="vlink hback" id="back">‹ Zurück</button>
