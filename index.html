@@ -71,9 +71,13 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;
 .fcard{flex:0 0 100%;scroll-snap-align:center;display:flex;align-items:center;gap:13px;padding:15px 16px;border-radius:16px;min-height:60px}
 .fi{font-size:26px;flex:0 0 auto}
 .ft{font-weight:700;font-size:14px;line-height:1.35}
-.fdots{display:flex;justify-content:center;gap:6px;margin-bottom:14px}
+.fdots{display:flex;justify-content:center;gap:6px;margin-top:10px}
 .fdot{width:6px;height:6px;border-radius:50%;transition:all .3s}
 .fdot.on{width:18px;border-radius:3px}
+.morelink{display:block;width:100%;margin-top:10px;padding:9px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:700}
+.morelink:active{opacity:.5}
+.dellink{display:block;margin:26px auto 6px;border:none;background:none;font-family:inherit;font-size:12.5px;padding:8px 12px;opacity:.4}
+.dellink:active{opacity:.8}
 .htitle-screen{font-size:30px!important;white-space:normal!important;margin-bottom:14px}
 .hback{align-self:flex-start;margin-bottom:10px}
 .vscroll{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px}
@@ -220,6 +224,8 @@ body,.screen{color:var(--ink)}
 .fcard{background:var(--card);border:1.5px solid var(--divider);color:var(--ink)}
 .fdot{background:var(--divider)}
 .fdot.on{background:var(--accent)}
+.morelink{color:var(--accent)}
+.dellink{color:var(--ink);text-decoration:underline}
 .hcard{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:11px 14px}
 .hdot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:0 0 auto}
 .hmid{flex:1;min-width:0}
@@ -324,7 +330,8 @@ function pickFacts(all,n){
   try{localStorage.setItem('punkte_factseen',JSON.stringify(newSeen))}catch(e){}
   return pick;
 }
-let histSel=null,factTimer=null;
+let histSel=null,factTimer=null,histExpanded=false;
+function recentHTML(h,exp){return h.slice(0,exp?20:5).map(histCard).join('')}
 function renderHistory(dir){
   clearInterval(factTimer);
   const h=Hist.load();
@@ -338,19 +345,20 @@ function renderHistory(dir){
     <h1 class="htitle htitle-screen">Bestenliste</h1>
     <div class="vscroll">
       ${h.length?`
-        ${facts.length?`<div class="facts" id="facts">${facts.map(f=>`<div class="fcard"><span class="fi">${f.i}</span><span class="ft">${esc(f.t)}</span></div>`).join('')}</div>${facts.length>1?`<div class="fdots" id="fdots">${facts.map((_,i)=>`<span class="fdot ${i===0?'on':''}"></span>`).join('')}</div>`:''}`:''}
         <div class="games histgames">
           <button class="gtile ${histSel==='flip7'?'on':''}" data-g="flip7">${logo('flip7','')}<span class="gcount">${flipN}×</span></button>
           <button class="gtile ${histSel==='uno'?'on':''}" data-g="uno">${logo('uno','')}<span class="gcount">${unoN}×</span></button>
         </div>
         <div class="medals" id="medals">${medalBoard(histSel)}</div>
-        <div class="lbl" style="margin-top:18px">Letzte Spiele</div>
-        <div class="hlist">${h.slice(0,20).map(histCard).join('')}</div>
+        ${facts.length?`<div class="facts" id="facts" style="margin-top:24px">${facts.map(f=>`<div class="fcard"><span class="fi">${f.i}</span><span class="ft">${esc(f.t)}</span></div>`).join('')}</div>${facts.length>1?`<div class="fdots" id="fdots">${facts.map((_,i)=>`<span class="fdot ${i===0?'on':''}"></span>`).join('')}</div>`:''}`:''}
+        <div class="lbl" style="margin-top:24px">Letzte Spiele</div>
+        <div class="hlist" id="reclist">${recentHTML(h,histExpanded)}</div>
+        ${h.length>5?`<button class="morelink" id="more">${histExpanded?'Weniger anzeigen':`Mehr anzeigen (${h.length-5})`}</button>`:''}
+        <button class="dellink" id="clear">Verlauf löschen</button>
       `:`<p class="hint" style="text-align:center;margin-top:40px;font-size:15px">Noch keine Spiele gespielt.<br>Beende ein Spiel über „Spiel beenden", dann erscheint es hier.</p>`}
     </div>
-    ${h.length?`<button class="start ghostbtn" id="clear">Verlauf löschen</button>`:''}
    </div>`,dir);
-  v.querySelector('#back').onclick=()=>{clearInterval(factTimer);histSel=null;buzz(8);renderSetup(-1)};
+  v.querySelector('#back').onclick=()=>{clearInterval(factTimer);histSel=null;histExpanded=false;buzz(8);renderSetup(-1)};
   const fe=v.querySelector('#facts');
   if(fe&&facts.length>1){
     const dots=[...v.querySelectorAll('#fdots .fdot')];
@@ -363,8 +371,12 @@ function renderHistory(dir){
     v.querySelectorAll('.histgames .gtile').forEach(x=>x.classList.toggle('on',x.dataset.g===histSel));
     v.querySelector('#medals').innerHTML=medalBoard(histSel);
   });
+  const more=v.querySelector('#more');
+  if(more)more.onclick=()=>{buzz(6);histExpanded=!histExpanded;
+    v.querySelector('#reclist').innerHTML=recentHTML(h,histExpanded);
+    more.textContent=histExpanded?'Weniger anzeigen':`Mehr anzeigen (${h.length-5})`;};
   const c=v.querySelector('#clear');
-  if(c)c.onclick=()=>{if(confirm('Gesamten Verlauf unwiderruflich löschen?')){buzz(20);Hist.clear();histSel=null;renderHistory()}};
+  if(c)c.onclick=()=>{if(confirm('Verlauf wirklich vollständig löschen? Das lässt sich nicht rückgängig machen.')){buzz(20);Hist.clear();histSel=null;histExpanded=false;renderHistory()}};
 }
 function histCard(r){
   const d=new Date(r.ts);
