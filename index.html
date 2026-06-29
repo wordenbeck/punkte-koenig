@@ -193,7 +193,8 @@ body,.screen{color:var(--ink)}
 /* Historie */
 .vlink{border:1.5px solid var(--outline);background:var(--card);color:var(--ink);font-family:inherit;font-weight:800;font-size:14px;padding:8px 13px;border-radius:12px}
 .vlink:active{transform:scale(.95)}
-.vlink.corner{border:none;background:none;color:var(--ink);opacity:.5;font-weight:700;font-size:13px;padding:4px 2px}
+.vlink.corner{border:none;background:none;color:var(--ink);opacity:.55;padding:6px;line-height:0}
+.vlink.corner svg{display:block}
 .cattitle{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;opacity:.5;color:var(--ink)}
 .catgames{color:var(--ink);opacity:.55;font-weight:600}
 .catlead{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--outline);border-radius:14px;padding:12px 15px;box-shadow:2px 2px 0 var(--shadowc)}
@@ -318,7 +319,7 @@ function renderSetup(dir){
   setTheme(draft.game);
   const v=view(`
    <div class="setup">
-    <button class="vlink corner" id="verlauf">Verlauf ›</button>
+    <button class="vlink corner" id="verlauf" aria-label="Verlauf"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 14v2.2l1.6 1"/><path d="M16 4h2a2 2 0 0 1 2 2v.832"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h2"/><circle cx="16" cy="16" r="6"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></button>
     <h1 class="htitle">Wer wird König oder Königin?</h1>
     <div class="games">
       <button class="gtile ${draft.game==='flip7'?'on':''}" data-g="flip7" aria-label="Flip 7">${logo('flip7','')}</button>
