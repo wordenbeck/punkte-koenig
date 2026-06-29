@@ -65,7 +65,15 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;
 .plus{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
 .plist{margin-bottom:16px}
 .setup{position:relative}
-.vlink.corner{position:absolute;top:54px;right:20px;z-index:10}
+.vlink.corner{position:absolute;top:48px;right:18px;z-index:10}
+.facts{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;margin-bottom:8px}
+.facts::-webkit-scrollbar{display:none}
+.fcard{flex:0 0 100%;scroll-snap-align:center;display:flex;align-items:center;gap:13px;padding:15px 16px;border-radius:16px;min-height:60px}
+.fi{font-size:26px;flex:0 0 auto}
+.ft{font-weight:700;font-size:14px;line-height:1.35}
+.fdots{display:flex;justify-content:center;gap:6px;margin-bottom:14px}
+.fdot{width:6px;height:6px;border-radius:50%;transition:all .3s}
+.fdot.on{width:18px;border-radius:3px}
 .htitle-screen{font-size:30px!important;white-space:normal!important;margin-bottom:14px}
 .hback{align-self:flex-start;margin-bottom:10px}
 .vscroll{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px}
@@ -209,6 +217,9 @@ body,.screen{color:var(--ink)}
 .med{background:var(--card);border:1.5px solid var(--divider);color:var(--ink)}
 .med.first{border:2px solid var(--outline);box-shadow:2px 2px 0 var(--shadowc)}
 .med .mv{color:var(--lead)}
+.fcard{background:var(--card);border:1.5px solid var(--divider);color:var(--ink)}
+.fdot{background:var(--divider)}
+.fdot.on{background:var(--accent)}
 .hcard{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:11px 14px}
 .hdot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:0 0 auto}
 .hmid{flex:1;min-width:0}
@@ -265,9 +276,59 @@ function medalBoard(game){
     <span class="mv">${x.w}</span>
   </div>`).join('');
 }
-let histSel=null;
+function rankInGame(r){
+  const arr=(r.players||[]).map((n,i)=>({n,s:parseInt(r.scores[i])||0}));
+  arr.sort((a,b)=> r.game==='uno'? a.s-b.s : b.s-a.s);
+  return arr;
+}
+// Priorität je Fakt-Kategorie (höher = interessanter / häufiger gezogen)
+const FACT_PRIO={streak:3.5,milestone:4,king:3,never:2.5,quote:2,highscore:2,closest:2,widest:1.8,fav:1.6,second:1.6,pech:1.6,vielspieler:1.4,long:1.2,short:1.2};
+function buildFacts(h){
+  const F=[]; if(!h.length) return F;
+  const add=(k,i,t)=>F.push({k,i,t});
+  const sorted=[...h].sort((a,b)=>b.ts-a.ts);
+  let streak=1; for(let i=1;i<sorted.length;i++){if(sorted[i].winner===sorted[0].winner)streak++;else break;}
+  if(streak>=2) add('streak','🔥',`${sorted[0].winner} hat die letzten ${streak} Spiele in Folge gewonnen.`);
+  const wins={},parts={},seconds={},lasts={},players=new Set();
+  h.forEach(r=>{const rk=rankInGame(r);rk.forEach(p=>{parts[p.n]=(parts[p.n]||0)+1;players.add(p.n)});wins[r.winner]=(wins[r.winner]||0)+1;if(rk.length>=2){seconds[rk[1].n]=(seconds[rk[1].n]||0)+1;const last=rk[rk.length-1].n;lasts[last]=(lasts[last]||0)+1;}});
+  const unoN=h.filter(r=>r.game==='uno').length, flipN=h.filter(r=>r.game==='flip7').length;
+  if(unoN!==flipN){const f=unoN>flipN?['Uno',unoN,flipN]:['Flip 7',flipN,unoN];add('fav','❤️',`Euer Lieblingsspiel: ${f[0]} (${f[1]}:${f[2]}).`);}
+  if(h.length%10===0) add('milestone','🎉',`Euer ${h.length}. Spiel — Glückwunsch!`);
+  const wk={},weekAgo=Date.now()-7*864e5; h.filter(r=>r.ts>=weekAgo).forEach(r=>wk[r.winner]=(wk[r.winner]||0)+1);
+  let king=null; Object.keys(wk).forEach(n=>{if(!king||wk[n]>king.c)king={n,c:wk[n]}}); if(king&&king.c>=2)add('king','👑',`König der Woche: ${king.n} (${king.c} Siege).`);
+  let bestQ=null; Object.keys(parts).forEach(n=>{if(parts[n]>=3){const q=(wins[n]||0)/parts[n];if(!bestQ||q>bestQ.q)bestQ={n,q};}}); if(bestQ&&bestQ.q>0)add('quote','📊',`Beste Siegquote: ${bestQ.n} (${Math.round(bestQ.q*100)} %).`);
+  let vp=null; Object.keys(parts).forEach(n=>{if(!vp||parts[n]>vp.c)vp={n,c:parts[n]}}); if(vp&&vp.c>=4)add('vielspieler','🪑',`Dauergast: ${vp.n} war bei ${vp.c} Partien dabei.`);
+  let sec=null; Object.keys(seconds).forEach(n=>{if(!sec||seconds[n]>sec.c)sec={n,c:seconds[n]}}); if(sec&&sec.c>=2&&(seconds[sec.n]>(wins[sec.n]||0)))add('second','🥈',`Ewiger Zweiter: ${sec.n} (${sec.c}× Platz 2).`);
+  let pv=null; Object.keys(lasts).forEach(n=>{if(!pv||lasts[n]>pv.c)pv={n,c:lasts[n]}}); if(pv&&pv.c>=2)add('pech','🍀',`Pechvogel: ${pv.n} wurde ${pv.c}× Letzter.`);
+  let closest=null,widest=null; h.forEach(r=>{const rk=rankInGame(r);if(rk.length>=2){const m=Math.abs(rk[0].s-rk[1].s);if(closest===null||m<closest.m)closest={m,n:r.winner};if(widest===null||m>widest.m)widest={m,n:r.winner};}});
+  if(closest)add('closest','😬',`Knappster Sieg: nur ${closest.m} Punkte Abstand (${closest.n}).`);
+  if(widest&&closest&&widest.m!==closest.m)add('widest','💥',`Größter Vorsprung: ${widest.m} Punkte (${widest.n}).`);
+  const flips=h.filter(r=>r.game==='flip7'); if(flips.length){let hs=null;flips.forEach(r=>{const ws=parseInt(r.scores[r.players.indexOf(r.winner)])||0;if(hs===null||ws>hs.s)hs={s:ws,n:r.winner}});if(hs)add('highscore','🚀',`Höchster Siegscore: ${hs.n} mit ${hs.s} (Flip 7).`);}
+  let lo=null,sh=null; h.forEach(r=>{if(r.rounds>0){if(!lo||r.rounds>lo.r)lo={r:r.rounds};if(!sh||r.rounds<sh.r)sh={r:r.rounds};}});
+  if(lo)add('long','🐢',`Längstes Spiel: ${lo.r} Runden.`); if(sh&&lo&&sh.r!==lo.r)add('short','⚡',`Kürzestes Spiel: ${sh.r} Runden.`);
+  if(unoN>0&&flipN>0)[...players].forEach(n=>{const u=h.some(r=>r.game==='uno'&&r.players.includes(n)),fl=h.some(r=>r.game==='flip7'&&r.players.includes(n));if(fl&&!u)add('never','🚫',`${n} spielt nie bei Uno mit.`);else if(u&&!fl)add('never','🚫',`${n} spielt nie bei Flip 7 mit.`);});
+  return F;
+}
+// Wählt rotierend bis zu 3 Fakten: Priorität + Zufall, kürzlich Gezeigtes abgewertet
+function pickFacts(all,n){
+  if(all.length<=n) return all.slice();
+  let seen=[]; try{seen=JSON.parse(localStorage.getItem('punkte_factseen'))||[]}catch(e){}
+  const scored=all.map(f=>{
+    const base=FACT_PRIO[f.k]||1;
+    const rec=seen.indexOf(f.k);                 // -1 = lange nicht gezeigt
+    const penalty=rec===-1?1:0.12+0.1*(seen.length-1-rec); // je frischer gezeigt, desto kleiner
+    return {f,score:base*penalty*(0.6+Math.random())};
+  }).sort((a,b)=>b.score-a.score);
+  const pick=scored.slice(0,n).map(x=>x.f);
+  const newSeen=[...seen.filter(k=>!pick.some(f=>f.k===k)),...pick.map(f=>f.k)].slice(-8);
+  try{localStorage.setItem('punkte_factseen',JSON.stringify(newSeen))}catch(e){}
+  return pick;
+}
+let histSel=null,factTimer=null;
 function renderHistory(dir){
+  clearInterval(factTimer);
   const h=Hist.load();
+  const facts=pickFacts(buildFacts(h),3);
   const unoN=h.filter(r=>r.game==='uno').length, flipN=h.filter(r=>r.game==='flip7').length;
   if(!histSel) histSel = unoN>flipN?'uno':'flip7';   // Default = meistgespielt
   setTheme(histSel);
@@ -277,6 +338,7 @@ function renderHistory(dir){
     <h1 class="htitle htitle-screen">Bestenliste</h1>
     <div class="vscroll">
       ${h.length?`
+        ${facts.length?`<div class="facts" id="facts">${facts.map(f=>`<div class="fcard"><span class="fi">${f.i}</span><span class="ft">${esc(f.t)}</span></div>`).join('')}</div>${facts.length>1?`<div class="fdots" id="fdots">${facts.map((_,i)=>`<span class="fdot ${i===0?'on':''}"></span>`).join('')}</div>`:''}`:''}
         <div class="games histgames">
           <button class="gtile ${histSel==='flip7'?'on':''}" data-g="flip7">${logo('flip7','')}<span class="gcount">${flipN}×</span></button>
           <button class="gtile ${histSel==='uno'?'on':''}" data-g="uno">${logo('uno','')}<span class="gcount">${unoN}×</span></button>
@@ -288,7 +350,14 @@ function renderHistory(dir){
     </div>
     ${h.length?`<button class="start ghostbtn" id="clear">Verlauf löschen</button>`:''}
    </div>`,dir);
-  v.querySelector('#back').onclick=()=>{histSel=null;buzz(8);renderSetup(-1)};
+  v.querySelector('#back').onclick=()=>{clearInterval(factTimer);histSel=null;buzz(8);renderSetup(-1)};
+  const fe=v.querySelector('#facts');
+  if(fe&&facts.length>1){
+    const dots=[...v.querySelectorAll('#fdots .fdot')];
+    const setDot=idx=>dots.forEach((d,i)=>d.classList.toggle('on',i===idx));
+    fe.addEventListener('scroll',()=>setDot(Math.round(fe.scrollLeft/fe.clientWidth)),{passive:true});
+    factTimer=setInterval(()=>{const nx=(Math.round(fe.scrollLeft/fe.clientWidth)+1)%facts.length;fe.scrollTo({left:nx*fe.clientWidth,behavior:'smooth'});setDot(nx);},4500);
+  }
   v.querySelectorAll('.histgames .gtile').forEach(b=>b.onclick=()=>{
     histSel=b.dataset.g;buzz(8);setTheme(histSel);
     v.querySelectorAll('.histgames .gtile').forEach(x=>x.classList.toggle('on',x.dataset.g===histSel));
