@@ -64,6 +64,11 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;
 .addrow{display:flex;align-items:center;gap:11px;padding:11px 0;border:none;background:none;font-size:15px;font-weight:600}
 .plus{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
 .plist{margin-bottom:16px}
+.stop{display:flex;justify-content:flex-end;margin-bottom:2px}
+.htitle-screen{font-size:30px!important;white-space:normal!important;margin-bottom:14px}
+.vscroll{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.vscroll::-webkit-scrollbar{display:none}
+.lblist,.hlist{display:flex;flex-direction:column;gap:7px}
 .start{margin-top:auto;border:none;padding:16px;font-size:18px;font-weight:700}
 .start:active{transform:scale(.97)}
 
@@ -179,6 +184,22 @@ body,.screen{color:var(--ink)}
 .wbtn{background:var(--accent);color:var(--accent-ink);border:2px solid var(--outline)}
 .wbtn.ghost{background:var(--card);color:var(--ink)}
 
+/* Historie */
+.vlink{border:1.5px solid var(--outline);background:var(--card);color:var(--ink);font-family:inherit;font-weight:800;font-size:14px;padding:8px 13px;border-radius:12px}
+.vlink:active{transform:scale(.95)}
+.lbrow{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:13px;padding:11px 15px}
+.lbpos{font-weight:900;color:var(--accent);width:18px;text-align:center}
+.lbname{flex:1;font-weight:800;color:var(--ink)}
+.lbwins{font-weight:800;color:var(--lead);font-size:14px}
+.hcard{display:flex;align-items:center;gap:11px;background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:11px 14px}
+.hdot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:0 0 auto}
+.hmid{flex:1;min-width:0}
+.hwin{font-weight:800;color:var(--ink)}
+.hsub{font-size:12px;color:var(--ink);opacity:.55;margin-top:1px}
+.hscore{font-weight:900;font-size:18px;color:var(--ink)}
+.ghostbtn{background:var(--card);color:var(--accent);border:1.5px solid var(--outline);box-shadow:none;margin-top:12px}
+.ghostbtn:active{transform:scale(.97)}
+
 </style></head>
 <body data-store="d2" data-game="flip7">
 <div class="phone"><div class="island"></div><div class="screen"><div id="app"></div></div></div>
@@ -199,7 +220,50 @@ const KEY='punkte_'+(document.body.dataset.store||'app');
 const app=document.getElementById('app');
 
 const Store={load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}},save(){localStorage.setItem(KEY,JSON.stringify(game))},clear(){localStorage.removeItem(KEY)}};
+const HKEY='punkte_history';
+const Hist={
+  load(){try{return JSON.parse(localStorage.getItem(HKEY))||[]}catch(e){return []}},
+  save(a){localStorage.setItem(HKEY,JSON.stringify(a))},
+  upsert(rec){const a=Hist.load();const i=a.findIndex(x=>x.id===rec.id);if(i>=0)a[i]=rec;else a.unshift(rec);Hist.save(a)},
+  clear(){localStorage.removeItem(HKEY)}
+};
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
+/* ================= HISTORIE ================= */
+function renderHistory(dir){
+  const h=Hist.load();
+  const wins={};h.forEach(r=>{wins[r.winner]=(wins[r.winner]||0)+1});
+  const lb=Object.entries(wins).sort((a,b)=>b[1]-a[1]);
+  const v=view(`
+   <div class="game">
+    <div class="stop"><button class="vlink" id="back">‹ Zurück</button></div>
+    <h1 class="htitle htitle-screen">Verlauf</h1>
+    <div class="vscroll">
+      ${h.length?`
+        <div class="lbl">Bestenliste 🏆</div>
+        <div class="lblist">${lb.map(([n,c],i)=>`<div class="lbrow"><span class="lbpos">${i+1}</span><span class="lbname">${esc(n)}</span><span class="lbwins">${c}× gewonnen</span></div>`).join('')}</div>
+        <div class="lbl" style="margin-top:20px">Letzte Spiele · ${h.length}</div>
+        <div class="hlist">${h.map(histCard).join('')}</div>
+      `:`<p class="hint" style="text-align:center;margin-top:40px;font-size:15px">Noch keine Spiele gespielt.<br>Beende ein Spiel über „Spiel beenden", dann erscheint es hier.</p>`}
+    </div>
+    ${h.length?`<button class="start ghostbtn" id="clear">Verlauf löschen</button>`:''}
+   </div>`,dir);
+  v.querySelector('#back').onclick=()=>{buzz(8);renderSetup(-1)};
+  const c=v.querySelector('#clear');
+  if(c)c.onclick=()=>{if(confirm('Gesamten Verlauf unwiderruflich löschen?')){buzz(20);Hist.clear();renderHistory()}};
+}
+function histCard(r){
+  const d=new Date(r.ts);
+  const date=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+  const idx=r.players.indexOf(r.winner);
+  const col=COLORS[(idx<0?0:idx)%COLORS.length];
+  const ws=idx>=0?r.scores[idx]:'';
+  return `<div class="hcard">
+    <span class="hdot" style="background:${col}">${esc(initial(r.winner))}</span>
+    <div class="hmid"><div class="hwin">${esc(r.winner)} 👑</div>
+      <div class="hsub">${r.game==='flip7'?'Flip 7':'Uno'} · ${r.rounds} Runden · ${date}</div></div>
+    <span class="hscore">${ws}</span>
+  </div>`;
+}
 function initial(s){return (String(s||'').trim().charAt(0)||'?').toUpperCase()}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function logo(g,cls){return `<span class="logo ${cls||''}" data-g="${g}"><img src="${LOGOS[g]}" alt="${g==='flip7'?'Flip 7':'Uno'}" onerror="this.parentNode.classList.add('nologo');this.remove()"></span>`}
@@ -225,6 +289,7 @@ function renderSetup(dir){
   setTheme(draft.game);
   const v=view(`
    <div class="setup">
+    <div class="stop"><button class="vlink" id="verlauf">📜 Verlauf</button></div>
     <h1 class="htitle">Wer wird König oder Königin? 👑</h1>
     <div class="games">
       <button class="gtile ${draft.game==='flip7'?'on':''}" data-g="flip7" aria-label="Flip 7">${logo('flip7','')}</button>
@@ -241,6 +306,7 @@ function renderSetup(dir){
     v.querySelectorAll('.gtile').forEach(x=>x.classList.toggle('on',x.dataset.g===draft.game));
     b.classList.remove('pick');void b.offsetWidth;b.classList.add('pick');drawPills(v)});
   v.querySelector('#start').onclick=()=>{buzz(15);const t=v.querySelector('.gtile.on');t.classList.add('pick');setTimeout(startGame,160)};
+  v.querySelector('#verlauf').onclick=()=>{buzz(8);renderHistory(1)};
   drawPills(v);drawPlayers(v);
 }
 function drawPills(v){
@@ -268,7 +334,7 @@ function drawPlayers(v){
 }
 function startGame(){
   const names=draft.players.map((n,i)=>n.trim()||('Spieler '+(i+1)));
-  game={game:draft.game,players:names,target:draft.target,rounds:[names.map(()=>'')]};
+  game={id:Date.now(),game:draft.game,players:names,target:draft.target,rounds:[names.map(()=>'')]};
   Store.save();renderGame(1);
 }
 
@@ -342,6 +408,8 @@ function showWinner(v){
   const t=totals(),low=game.game==='uno';
   const ranked=game.players.map((n,i)=>({n,val:t[i],c:COLORS[i%COLORS.length]})).sort((a,b)=>low?a.val-b.val:b.val-a.val);
   const w=ranked[0],ov=v.querySelector('#ov');
+  if(!game.id)game.id=Date.now();
+  Hist.upsert({id:game.id,ts:Date.now(),game:game.game,players:game.players.slice(),scores:t.slice(),winner:w.n,rounds:completed()});Store.save();
   ov.innerHTML=`<div class="overlay" id="overlay"><div class="confetti" id="conf"></div>
    <div class="sheet"><div class="bigcrown">👑</div><div class="wlabel">Punktekönig</div>
     <div class="wname">${esc(w.n)}</div><div class="wpts">${w.val} Punkte · ${completed()} Runden</div>
